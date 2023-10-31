@@ -122,7 +122,7 @@ pub enum EmbedHyperlinks {
 pub enum QuoteStyle {
     /// Don't ever quote file names.
     Never,
-    /// Quote file names that contain spaces
+    /// Quote file names that contain spaces (default)
     Auto,
     /// Always quote file names.
     Always,
