@@ -2,6 +2,7 @@
 
 use std::io::{self, Write};
 
+use crate::output::table::Row;
 use ansiterm::ANSIStrings;
 use term_grid as grid;
 
@@ -20,6 +21,7 @@ use crate::output::tree::{TreeDepth, TreeParams};
 use crate::theme::Theme;
 
 use super::file_name::QuoteStyle;
+use super::TextCellContents;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Options {
@@ -134,14 +136,14 @@ impl<'a> Render<'a> {
     // because grid-details has no tree view.
 
     pub fn render<W: Write>(mut self, w: &mut W) -> io::Result<()> {
-        if let Some((grid, width)) = self.find_fitting_grid() {
-            write!(w, "{}", grid.fit_into_columns(width))
+        if let Some(grid) = self.find_fitting_grid() {
+            write!(w, "{grid}")
         } else {
             self.give_up().render(w)
         }
     }
 
-    pub fn find_fitting_grid(&mut self) -> Option<(grid::Grid, grid::Width)> {
+    pub fn find_fitting_grid(&mut self) -> Option<grid::Grid<TextCell>> {
         let options = self
             .details
             .table
@@ -197,7 +199,7 @@ impl<'a> Render<'a> {
         let mut last_working_grid = self.make_grid(1, options, &file_names, rows.clone(), &drender);
 
         if file_names.len() == 1 {
-            return Some((last_working_grid, 1));
+            return Some(last_working_grid);
         }
 
         // If we can’t fit everything in a grid 100 columns wide, then
@@ -206,7 +208,7 @@ impl<'a> Render<'a> {
             let grid = self.make_grid(column_count, options, &file_names, rows.clone(), &drender);
 
             let the_grid_fits = {
-                let d = grid.fit_into_columns(column_count);
+                let d = self.make_grid(column_count, options, &file_names, rows.clone(), &drender);
                 d.width() <= self.console_width
             };
 
@@ -224,16 +226,18 @@ impl<'a> Render<'a> {
                 // and it turns out there aren’t enough rows to make it worthwhile
                 // (according to EZA_GRID_ROWS), then just resort to the lines view.
                 if let RowThreshold::MinimumRows(thresh) = self.row_threshold {
-                    if last_working_grid
-                        .fit_into_columns(last_column_count)
-                        .row_count()
-                        < thresh
-                    {
+                    if last_working_grid.row_count() < thresh {
                         return None;
                     }
                 }
 
-                return Some((last_working_grid, last_column_count));
+                return Some(self.make_grid(
+                    last_column_count,
+                    options,
+                    &file_names,
+                    rows,
+                    &drender,
+                ));
             }
         }
 
@@ -278,7 +282,7 @@ impl<'a> Render<'a> {
         file_names: &[TextCell],
         rows: Vec<TableRow>,
         drender: &DetailsRender<'_>,
-    ) -> grid::Grid {
+    ) -> grid::Grid<TextCell> {
         let mut tables = Vec::new();
         for _ in 0..column_count {
             tables.push(self.make_table(options, drender));
@@ -288,10 +292,8 @@ impl<'a> Render<'a> {
         if self.details.header {
             num_cells += column_count;
         }
-
         let original_height = divide_rounding_up(rows.len(), column_count);
         let height = divide_rounding_up(num_cells, column_count);
-
         for (i, (file_name, row)) in file_names.iter().zip(rows).enumerate() {
             let index = if self.grid.across {
                 i % column_count
@@ -308,7 +310,6 @@ impl<'a> Render<'a> {
             );
             rows.push(details_row);
         }
-
         let columns = tables
             .into_iter()
             .map(|(table, details_rows)| {
@@ -318,6 +319,7 @@ impl<'a> Render<'a> {
             })
             .collect::<Vec<_>>();
 
+        let mut cells: Vec<TextCell> = Vec::new();
         let direction = if self.grid.across {
             grid::Direction::LeftToRight
         } else {
@@ -325,35 +327,38 @@ impl<'a> Render<'a> {
         };
 
         let filling = grid::Filling::Spaces(4);
-        let mut grid = grid::Grid::new(grid::GridOptions { direction, filling });
-
         if self.grid.across {
             for row in 0..height {
                 for column in &columns {
                     if row < column.len() {
-                        let cell = grid::Cell {
-                            contents: ANSIStrings(&column[row].contents).to_string(),
-                            width: *column[row].width,
+                        let cell = TextCell {
+                            contents: ANSIStrings(&column[row].contents).to_string().into(),
+                            width: column[row].width(),
                         };
-
-                        grid.add(cell);
+                        cells.push(cell);
                     }
                 }
             }
         } else {
             for column in &columns {
                 for cell in column {
-                    let cell = grid::Cell {
-                        contents: ANSIStrings(&cell.contents).to_string(),
-                        width: *cell.width,
+                    let cell = TextCell {
+                        contents: ANSIStrings(&cell.contents).to_string().into(),
+                        width: cell.width(),
                     };
 
-                    grid.add(cell);
+                    cells.push(cell);
                 }
             }
         }
-
-        grid
+        term_grid::Grid::new(
+            cells,
+            grid::GridOptions {
+                direction,
+                filling,
+                width: self.console_width,
+            },
+        )
     }
 }
 

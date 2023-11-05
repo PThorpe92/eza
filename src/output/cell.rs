@@ -1,9 +1,10 @@
 //! The `TextCell` type for the details and lines views.
 
+use std::fmt::Display;
 use std::iter::Sum;
 use std::ops::{Add, Deref, DerefMut};
 
-use ansiterm::{ANSIString, ANSIStrings, Style};
+use ansiterm::{ANSIGenericStrings, ANSIString, ANSIStrings, Style};
 use unicode_width::UnicodeWidthStr;
 
 /// An individual cell that holds text in a table, used in the details and
@@ -23,6 +24,23 @@ pub struct TextCell {
 
     /// The Unicode “display width” of this cell.
     pub width: DisplayWidth,
+}
+
+impl From<ANSIGenericStrings<'_, str>> for TextCellContents {
+    fn from(string: ANSIGenericStrings<'_, str>) -> Self {
+        vec![Style::default().paint(string.to_string())]
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect::<Vec<String>>()
+            .concat()
+            .into()
+    }
+}
+
+impl Display for TextCellContents {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.iter().try_for_each(|s| s.fmt(f))
+    }
 }
 
 impl Deref for TextCell {
@@ -131,6 +149,28 @@ pub struct TextCellContents(Vec<ANSIString<'static>>);
 impl From<Vec<ANSIString<'static>>> for TextCellContents {
     fn from(strings: Vec<ANSIString<'static>>) -> Self {
         Self(strings)
+    }
+}
+
+impl From<String> for TextCellContents {
+    fn from(string: String) -> Self {
+        vec![Style::default().paint(string)].into()
+    }
+}
+
+impl std::convert::AsRef<str> for TextCell {
+    fn as_ref(&self) -> &str {
+        let cat_str = self
+            .contents
+            .0
+            .iter()
+            .map(|anstr| &**anstr)
+            .collect::<Vec<_>>()
+            .concat()
+            .as_str()
+            .to_owned();
+
+        Box::leak(Box::new(cat_str))
     }
 }
 

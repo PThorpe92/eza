@@ -373,6 +373,27 @@ pub struct Row {
     cells: Vec<TextCell>,
 }
 
+impl From<Vec<TextCell>> for Row {
+    fn from(cells: Vec<TextCell>) -> Self {
+        Self { cells }
+    }
+}
+
+impl AsRef<str> for Row {
+    fn as_ref(&self) -> &str {
+        let cat_str = self
+            .cells
+            .iter()
+            .map(|anstr| anstr.to_string())
+            .collect::<Vec<_>>()
+            .concat()
+            .as_str()
+            .to_owned();
+
+        Box::leak(Box::new(cat_str))
+    }
+}
+
 impl<'a> Table<'a> {
     pub fn new(options: &'a Options, git: Option<&'a GitCache>, theme: &'a Theme) -> Table<'a> {
         let columns = options.columns.collect(git.is_some());

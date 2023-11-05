@@ -41,7 +41,7 @@
 //! because the filename is always the rightmost field, and as such, it does not
 //! need to have its width queried or be padded with spaces.
 //!
-//! To illustrate the above:
+//! To illustrate the above:detailsdetails
 //!
 //! ```text
 //!     ┌─────────────────────────────────────────────────────────────────────────┐
