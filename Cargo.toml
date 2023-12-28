@@ -71,8 +71,11 @@ name = "eza"
 
 
 [dependencies]
+nu-ansi-term = { version = "0.50.0", features = [
+  "serde",
+  "derive_serde_style",
+] }
 chrono = { version = "0.4.33", default-features = false, features = ["clock"] }
-nu-ansi-term = "0.50.0"
 glob = "0.3"
 libc = "0.2"
 locale = "0.2"
@@ -90,7 +93,8 @@ timeago = { version = "0.4.2", default-features = false }
 unicode-width = "0.1"
 zoneinfo_compiled = "0.5.1"
 rayon = "1.8.1"
-
+serde = { version = "1.0.193", features = ["derive"] }
+serde_yaml = "0.9.29"
 [dependencies.git2]
 version = "0.18"
 optional = true
